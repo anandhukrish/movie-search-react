@@ -23,7 +23,6 @@ type Movie = {
 };
 
 function Home() {
-  const [search, setSearch] = useState("");
   const [movieResponse, setMovieResponse] = useState<MovieApiResponse | null>(
     null
   );
@@ -31,14 +30,19 @@ function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [movies, setMovies] = useState<Movie[] | null>(null);
-
   const [searchQuery, setSearchQuery] = useSearchParams();
+
+  const initialSearch = searchQuery.get("s") || "";
+  const [search, setSearch] = useState(initialSearch);
+
+  const debouncedValue = useDebounce(search);
 
   useEffect(() => {
     setSearchQuery({
-      page: "1",
+      page: searchQuery.get("page") || "1",
+      s: search,
     });
-  }, []);
+  }, [search]);
 
   const totelPages = Math.ceil(Number(movieResponse?.totalResults) / 10);
   const currentPage = Number(searchQuery.get("page")) || 1;
@@ -53,17 +57,14 @@ function Home() {
     );
   }, [currentPage, totelPages]);
 
-  const debouncedValue = useDebounce(search);
-
   useEffect(() => {
-    if (debouncedValue === "") {
+    if (!debouncedValue || debouncedValue === "") {
       setMovies(null);
+      return;
     }
-  }, [debouncedValue]);
-
-  useEffect(() => {
-    if (debouncedValue === "") return;
     const getMovies = async () => {
+      console.log("called getMovies", debouncedValue);
+      setError("");
       setLoading(true);
       try {
         const res = await api.get("", {
@@ -79,16 +80,14 @@ function Home() {
         }
         setMovieResponse(res.data);
         setMovies(res.data?.Search);
-        setLoading(false);
       } catch (e) {
         setError("An error occurred while fetching data");
       } finally {
         setLoading(false);
       }
     };
-    if (debouncedValue && debouncedValue !== "") {
-      getMovies();
-    }
+
+    getMovies();
   }, [debouncedValue, currentPage]);
 
   if (error != "")
@@ -99,6 +98,10 @@ function Home() {
           onClick={() => {
             setError("");
             setSearch("");
+            setSearchQuery({
+              page: "1",
+              s: "",
+            });
           }}
           className="border border-black px-5 py-2 rounded-md mt-5"
         >
@@ -124,7 +127,7 @@ function Home() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        {!movies && (
+        {!movies && initialSearch === "" && (
           <div className="h-full w-full flex items-center justify-center text-white">
             No Movies To List Please Search
           </div>
@@ -143,7 +146,9 @@ function Home() {
           <div className="flex justify-center py-5">
             <button
               className="px-5 py-3 border border-white/20 text-white hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-white/20"
-              onClick={() => setSearchQuery({ page: `${currentPage - 1}` })}
+              onClick={() =>
+                setSearchQuery({ page: `${currentPage - 1}`, s: search })
+              }
               disabled={currentPage === 1}
             >
               prev
@@ -154,7 +159,9 @@ function Home() {
                   "size-12  border-r border-white/20 text-white hover:bg-white/20",
                   currentPage === pageNum && "bg-white/20"
                 )}
-                onClick={() => setSearchQuery({ page: `${pageNum}` })}
+                onClick={() =>
+                  setSearchQuery({ page: `${pageNum}`, s: search })
+                }
                 key={i}
               >
                 {pageNum}
@@ -162,7 +169,9 @@ function Home() {
             ))}
             <button
               className="px-5 py-3 border border-white/20 text-white hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-white/20"
-              onClick={() => setSearchQuery({ page: `${currentPage + 1}` })}
+              onClick={() =>
+                setSearchQuery({ page: `${currentPage + 1}`, s: search })
+              }
               disabled={currentPage === totelPages}
             >
               next
